@@ -1,0 +1,84 @@
+{
+  "family": "wordpress-microservices",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "db",
+      "image": "mysql:8.0",
+      "essential": true,
+      "environment": [
+        { "name": "MYSQL_DATABASE", "value": "wordpress" },
+        { "name": "MYSQL_USER", "value": "wordpress" },
+        { "name": "MYSQL_PASSWORD", "value": "wordpress_password" },
+        { "name": "MYSQL_ROOT_PASSWORD", "value": "root_password" }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "db_data",
+          "containerPath": "/var/lib/mysql"
+        }
+      ]
+    },
+    {
+      "name": "redis",
+      "image": "redis:alpine",
+      "essential": true
+    },
+    {
+      "name": "wordpress",
+      "image": "wordpress:php8.1-fpm",
+      "essential": true,
+      "environment": [
+        { "name": "WORDPRESS_DB_HOST", "value": "db:3306" },
+        { "name": "WORDPRESS_DB_USER", "value": "wordpress" },
+        { "name": "WORDPRESS_DB_PASSWORD", "value": "wordpress_password" },
+        { "name": "WORDPRESS_DB_NAME", "value": "wordpress" },
+        { "name": "WORDPRESS_REDIS_HOST", "value": "redis" }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "wordpress_data",
+          "containerPath": "/var/www/html"
+        }
+      ],
+      "dependsOn": [
+        { "containerName": "db", "condition": "START" },
+        { "containerName": "redis", "condition": "START" }
+      ]
+    },
+    {
+      "name": "nginx",
+      "image": "nginx:alpine",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 80, "hostPort": 80 }
+      ],
+      "mountPoints": [
+        { "sourceVolume": "wordpress_data", "containerPath": "/var/www/html", "readOnly": true },
+        { "sourceVolume": "nginx_conf", "containerPath": "/etc/nginx/conf.d/default.conf", "readOnly": true }
+      ],
+      "dependsOn": [
+        { "containerName": "wordpress", "condition": "START" }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "db_data",
+      "host": {}
+    },
+    {
+      "name": "wordpress_data",
+      "host": {}
+    },
+    {
+      "name": "nginx_conf",
+      "host": {
+        "sourcePath": "./nginx/default.conf"
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512"
+}
